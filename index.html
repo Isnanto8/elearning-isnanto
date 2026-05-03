@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Learning Isnanto Virgunawan Wibowo, S.Pd.</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel untuk membaca React JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // ============================================================================
+        // KONFIGURASI API (Ganti dengan URL Web App dari Google Apps Script Bapak)
+        // ============================================================================
+        const API_URL = "https://script.google.com/macros/s/AKfycbzG-BhkQcWt5ckKctKiKixuWY0wC7iMMy4WaM2O5RtAreUtS2Co9zSJTrePHpDRNEYQ/exec";
+
+        // --- MOCK DATA (Ditampilkan jika API_URL belum diganti) ---
+        const MOCK_DATA = {
+            'Kelas 7': [
+                {
+                    id: 'k7-1',
+                    topik: 'Perbandingan',
+                    materi: [
+                        { id: 'm1', judul: 'Video Penjelasan Perbandingan', tipe: 'video', url: 'https://www.youtube.com/embed/libKVRa01L8', durasi: '15 Menit' },
+                        { id: 'm2', judul: 'Modul Latihan Perbandingan', tipe: 'pdf', url: '#', ukuran: '2 MB' }
+                    ],
+                    tugas: { id: 't1', judul: 'Tugas 1: Soal Cerita Perbandingan', deadline: 'Batas Waktu: 1 Minggu' }
+                }
+            ],
+            'Kelas 8': [
+                {
+                    id: 'k8-1',
+                    topik: 'Lingkaran',
+                    materi: [
+                        { id: 'm6', judul: 'Konsep Dasar Lingkaran', tipe: 'video', url: '#', durasi: '18 Menit' }
+                    ],
+                    tugas: { id: 't3', judul: 'Tugas 1: Evaluasi Lingkaran', deadline: 'Batas Waktu: 1 Minggu' }
+                }
+            ]
+        };
+
+        // --- ICON SVG ---
+        const IconSpinner = () => (
+            <svg className="animate-spin h-5 w-5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        );
+
+        function App() {
+            const [currentView, setCurrentView] = useState('dashboard');
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [uploadStatus, setUploadStatus] = useState('idle');
+            const [dataPembelajaran, setDataPembelajaran] = useState({});
+            const [activeKelas, setActiveKelas] = useState(''); 
+            const [isLoading, setIsLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            useEffect(() => {
+                const fetchData = async () => {
+                    setIsLoading(true);
+                    setError(null);
+
+                    if (API_URL === "URL_WEB_APP_APPS_SCRIPT_BAPAK_DISINI") {
+                        setTimeout(() => {
+                            setDataPembelajaran(MOCK_DATA);
+                            setActiveKelas('Kelas 7');
+                            setIsLoading(false);
+                        }, 1500);
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(API_URL);
+                        if (!response.ok) throw new Error('Gagal mengambil data dari server');
+                        
+                        const rawData = await response.json();
+                        const groupedData = {};
+                        
+                        rawData.forEach((row, index) => {
+                            const { Kelas, Topik, JudulMateri, Tipe, URL, Keterangan, JudulTugas, Deadline } = row;
+                            if (!Kelas || !Topik) return;
+
+                            if (!groupedData[Kelas]) groupedData[Kelas] = [];
+                            
+                            let topikObj = groupedData[Kelas].find(t => t.topik === Topik);
+                            
+                            if (!topikObj) {
+                                topikObj = {
+                                    id: `${Kelas}-${Topik}-${index}`,
+                                    topik: Topik,
+                                    materi: [],
+                                    tugas: JudulTugas ? { id: `tugas-${index}`, judul: JudulTugas, deadline: Deadline } : null
+                                };
+                                groupedData[Kelas].push(topikObj);
+                            }
+
+                            if (JudulMateri && URL) {
+                                topikObj.materi.push({
+                                    id: `materi-${index}`,
+                                    judul: JudulMateri,
+                                    tipe: (Tipe || 'pdf').toLowerCase(),
+                                    url: URL,
+                                    durasi: Tipe.toLowerCase() === 'video' ? Keterangan : null,
+                                    ukuran: Tipe.toLowerCase() !== 'video' ? Keterangan : null
+                                });
+                            }
+                        });
+
+                        setDataPembelajaran(groupedData);
+                        const kelasTersedia = Object.keys(groupedData);
+                        if (kelasTersedia.length > 0) setActiveKelas(kelasTersedia[0]);
+                        
+                    } catch (err) {
+                        setError(err.message);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+
+                fetchData();
+            }, []);
+
+            const handleUpload = (e) => {
+                e.preventDefault();
+                setUploadStatus('uploading');
+                
+                // Jika sudah ada API, ini harusnya fetch POST. Karena ini versi client, 
+                // ini disimulasikan sukses agar siswa tau UI nya berfungsi
+                setTimeout(() => {
+                    setUploadStatus('success');
+                }, 2000);
+            };
+
+            const renderDashboard = () => (
+                <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="bg-gradient-to-r from-slate-900 to-blue-900 border border-blue-800 rounded-xl p-6 flex items-center justify-between shadow-lg relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500 rounded-full mix-blend-screen filter blur-[64px] opacity-30"></div>
+                        <div className="relative z-10">
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                                Selamat datang, Murid Hebat! 🎓
+                            </h2>
+                            <p className="text-cyan-200 mt-1">Pilih kelasmu dan mulai pelajari materi yang tersedia.</p>
+                        </div>
+                    </div>
+
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center py-20">
+                            <div className="text-cyan-600 mb-4 scale-150"><IconSpinner /></div>
+                            <p className="text-slate-500 font-medium animate-pulse">Menyiapkan materi kelasmu...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-xl text-center">
+                            <p className="font-bold">Aduh! Terjadi Kesalahan</p>
+                            <p className="text-sm mt-1">{error}</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex space-x-3 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+                                {Object.keys(dataPembelajaran).map(kelas => (
+                                    <button
+                                        key={kelas}
+                                        onClick={() => setActiveKelas(kelas)}
+                                        className={`px-6 py-3 rounded-xl font-bold transition-all shadow-sm shrink-0 ${
+                                            activeKelas === kelas 
+                                                ? 'bg-cyan-600 text-white ring-2 ring-cyan-300 ring-offset-2 ring-offset-slate-50' 
+                                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-cyan-50 hover:text-cyan-700'
+                                        }`}
+                                    >
+                                        {kelas}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="space-y-6">
+                                {dataPembelajaran[activeKelas]?.map((itemTopik) => (
+                                    <div key={itemTopik.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                                            <h3 className="text-lg font-bold text-slate-800">Topik: {itemTopik.topik}</h3>
+                                        </div>
+                                        
+                                        <div className="p-6 space-y-4">
+                                            {itemTopik.materi.length > 0 && (
+                                                <>
+                                                    <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">📚 Materi Pembelajaran</h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        {itemTopik.materi.map((m) => (
+                                                            <button 
+                                                                key={m.id}
+                                                                onClick={() => { setSelectedItem(m); setCurrentView('materi'); }}
+                                                                className="flex items-start text-left p-4 rounded-lg border border-slate-200 hover:border-cyan-500 hover:bg-cyan-50 transition-colors shadow-sm group"
+                                                            >
+                                                                <div className="bg-slate-50 border border-slate-100 p-2 rounded-lg shadow-sm mr-4 text-cyan-600 group-hover:bg-cyan-100 transition-colors text-2xl">
+                                                                    {m.tipe === 'video' ? '📺' : m.tipe === 'pdf' ? '📄' : '📖'}
+                                                                </div>
+                                                                <div>
+                                                                    <h5 className="font-semibold text-slate-800">{m.judul}</h5>
+                                                                    <p className="text-xs text-slate-500 mt-1">
+                                                                        Format: {m.tipe.toUpperCase()} • {m.durasi || m.ukuran}
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+
+                                            {itemTopik.tugas && (
+                                                <>
+                                                    <h4 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mt-6 pt-4 border-t border-slate-100">📝 Penugasan</h4>
+                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-blue-50 border border-blue-100 rounded-lg gap-4">
+                                                        <div className="flex items-center">
+                                                            <span className="text-3xl mr-3">📝</span>
+                                                            <div>
+                                                                <h5 className="font-semibold text-blue-900">{itemTopik.tugas.judul}</h5>
+                                                                <p className="text-xs text-blue-700">{itemTopik.tugas.deadline}</p>
+                                                            </div>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => { setSelectedItem(itemTopik.tugas); setCurrentView('upload'); setUploadStatus('idle'); }}
+                                                            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm shrink-0 whitespace-nowrap"
+                                                        >
+                                                            Kumpulkan Tugas
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                
+                                {(!dataPembelajaran[activeKelas] || dataPembelajaran[activeKelas].length === 0) && (
+                                    <div className="text-center py-10 text-slate-500">
+                                        Belum ada materi untuk kelas ini.
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+
+            const renderMateriViewer = () => (
+                <div className="max-w-4xl mx-auto">
+                    <button onClick={() => { setCurrentView('dashboard'); setSelectedItem(null); }} className="flex items-center text-slate-600 hover:text-cyan-600 font-medium mb-6 transition-colors">
+                        ⬅️ Kembali ke Jadwal
+                    </button>
+                    
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-6 border-b border-slate-200">
+                            <h2 className="text-2xl font-bold text-slate-800">{selectedItem.judul}</h2>
+                            <p className="text-slate-500 mt-1">Materi Pembelajaran • Format: {selectedItem.tipe.toUpperCase()}</p>
+                        </div>
+                        
+                        <div className="bg-slate-100 aspect-video flex items-center justify-center p-4">
+                            {selectedItem.tipe === 'video' ? (
+                               <iframe 
+                                   className="w-full h-full rounded-lg shadow-sm"
+                                   src={selectedItem.url} 
+                                   title={selectedItem.judul}
+                                   frameBorder="0" 
+                                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                   allowFullScreen
+                               ></iframe>
+                            ) : (
+                                <div className="text-center">
+                                    <div className="text-6xl mb-4">📄</div>
+                                    <p className="text-slate-600">Tekan tombol di bawah untuk membuka file dokumen.</p>
+                                    <a 
+                                        href={selectedItem.url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-4 inline-block px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium shadow-sm transition-colors"
+                                    >
+                                        Buka Dokumen
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const renderUploadForm = () => (
+                <div className="max-w-2xl mx-auto">
+                    <button onClick={() => { setCurrentView('dashboard'); setSelectedItem(null); }} className="flex items-center text-slate-600 hover:text-cyan-600 font-medium mb-6 transition-colors">
+                        ⬅️ Kembali ke Jadwal
+                    </button>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+                        <div className="text-center mb-8">
+                            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                                ☁️
+                            </div>
+                            <h2 className="text-2xl font-bold text-slate-800">Kumpulkan Tugas</h2>
+                            <p className="text-slate-600 mt-2">{selectedItem.judul}</p>
+                        </div>
+
+                        {uploadStatus === 'success' ? (
+                            <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl p-6 text-center">
+                                <div className="text-6xl mb-4">✅</div>
+                                <h3 className="text-xl font-bold mb-2">Tugas Berhasil Dikirim!</h3>
+                                <p>Terima kasih, tugasmu sudah tersimpan dengan aman.</p>
+                                <button 
+                                    onClick={() => { setCurrentView('dashboard'); setSelectedItem(null); }}
+                                    className="mt-6 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors"
+                                >
+                                    Kembali ke Dashboard
+                                </button>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleUpload} className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Nama Lengkap Siswa</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
+                                        placeholder="Contoh: Budi Santoso"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-2">Pilih File Tugas</label>
+                                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 transition-colors cursor-pointer relative overflow-hidden">
+                                        <input type="file" accept=".pdf,.doc,.docx,.jpg,.png" required className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" id="file-upload" />
+                                        <div className="pointer-events-none">
+                                            <div className="text-4xl mb-3">☁️</div>
+                                            <span className="block text-slate-600 font-medium">Klik atau seret file ke area ini</span>
+                                            <span className="block text-xs text-slate-500 mt-2">Maks. 10MB (PDF, DOCX, JPG, PNG)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    type="submit" 
+                                    disabled={uploadStatus === 'uploading'}
+                                    className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm transition-colors flex justify-center items-center disabled:opacity-70 disabled:cursor-not-allowed"
+                                >
+                                    {uploadStatus === 'uploading' ? (
+                                        <span className="flex items-center gap-2"><IconSpinner /> Mengunggah File...</span>
+                                    ) : 'Kirim Tugas Sekarang'}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            );
+
+            return (
+                <div>
+                    {/* Header */}
+                    <header className="bg-slate-900 text-white sticky top-0 z-10 shadow-lg border-b-2 border-cyan-500">
+                        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                            <div className="flex items-center space-x-3 cursor-pointer overflow-hidden" onClick={() => { setCurrentView('dashboard'); setSelectedItem(null); }}>
+                                <div className="bg-gradient-to-br from-cyan-400 to-blue-600 p-1.5 rounded-lg shadow-sm shrink-0 flex items-center justify-center w-8 h-8">
+                                    <span className="text-xl leading-none">👨‍🏫</span>
+                                </div>
+                                <h1 className="text-lg sm:text-xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200 truncate">
+                                    Isnanto Virgunawan Wibowo, S.Pd.
+                                </h1>
+                            </div>
+                            <div className="hidden sm:flex items-center space-x-4 text-sm font-medium shrink-0 ml-4">
+                                <span className="bg-slate-800 border border-cyan-500/30 text-cyan-300 px-4 py-1 rounded-full shadow-inner tracking-wide">
+                                    Kelas Daring
+                                </span>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-6xl mx-auto px-4 py-8">
+                        {currentView === 'dashboard' && renderDashboard()}
+                        {currentView === 'materi' && renderMateriViewer()}
+                        {currentView === 'upload' && renderUploadForm()}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
